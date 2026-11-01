@@ -7,3 +7,7 @@ class Parking (BaseModel):
     lon:float
     total_spots: int
     free_spots: int
+
+class NearbyParking (BaseModel):
+    parking: Parking
+    distance_m: int

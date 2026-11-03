@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import cv2
 from ultralytics import YOLO
+from spot import TOTAL_SPOTS, free_spots
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = YOLO(str(ROOT / "yolo11n-obb.pt"))
@@ -26,8 +27,7 @@ def detect_vehicles(image_path: str) -> int:
     height, width = image.shape[:2]
     x1, y1, x2, y2 = lot_pixels(width, height)
     crop = image[y1:y2, x1:x2].copy()
-
-    results = MODEL(crop,classes=VEHICLE_CLASSES,conf=0.15,imgsz=224,verbose=False,)
+    results = MODEL(crop, classes=VEHICLE_CLASSES, conf=0.15, imgsz=224, verbose=False)
     result = results[0]
     found = []
     if result.obb is not None:
@@ -50,12 +50,15 @@ def detect_vehicles(image_path: str) -> int:
         points = points.astype(int)
         cv2.polylines(image, [points], isClosed=True, color=(0, 255, 0), thickness=2)
 
+    free = free_spots(len(kept))
     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 4)
-    cv2.putText(image,f"Vo parcelata: {len(kept)}",(40, 120),cv2.FONT_HERSHEY_SIMPLEX,2.4,(0, 0, 255),5,)
+    cv2.putText(image, f"Vo parcelata: {len(kept)}", (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)
+    cv2.putText(image, f"Slobodni: {free}", (40, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)
     OUTPUT_DIR.mkdir(exist_ok=True)
     out_path = OUTPUT_DIR / f"detected_{Path(image_path).name}"
     cv2.imwrite(str(out_path), image)
     print(f"Vozila vo parcelata: {len(kept)}")
+    print(f"Slobodni mesta: {free} od {TOTAL_SPOTS}")
     print(f"Zacuvano vo: {out_path}")
     return len(kept)
 

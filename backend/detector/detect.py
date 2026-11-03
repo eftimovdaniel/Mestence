@@ -2,7 +2,11 @@ import sys
 from pathlib import Path
 import cv2
 from ultralytics import YOLO
-from spot import TOTAL_SPOTS, free_spots
+
+try:
+    from spot import free_spots, TOTAL_SPOTS
+except ImportError:
+    from detector.spot import free_spots, TOTAL_SPOTS
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = YOLO(str(ROOT / "yolo11n-obb.pt"))
@@ -35,21 +39,18 @@ def detect_vehicles(image_path: str) -> int:
             points = box.xyxyxyxy[0].cpu().numpy()
             center = (float(points[:, 0].mean()), float(points[:, 1].mean()))
             found.append((float(box.conf[0]), center, points))
-
     found.sort(key=lambda item: item[0], reverse=True)
     kept = []
     for item in found:
         if any(same_car(item[1], other[1]) for other in kept):
             continue
         kept.append(item)
-
     for conf, center, points in kept:
         points = points.copy()
         points[:, 0] += x1
         points[:, 1] += y1
         points = points.astype(int)
         cv2.polylines(image, [points], isClosed=True, color=(0, 255, 0), thickness=2)
-
     free = free_spots(len(kept))
     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 4)
     cv2.putText(image, f"Vo parcelata: {len(kept)}", (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)

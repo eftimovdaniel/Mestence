@@ -1,8 +1,8 @@
 TOTAL_SPOTS = 60
 
-def free_spots(occupied: int) -> int:
-    if occupied < 0:
+def free_spots(occupied: int, total: int = TOTAL_SPOTS) -> int:
+    if occupied < 0 :
         occupied = 0
-    if occupied > TOTAL_SPOTS:
+    if occupied > total:
         return 0
-    return TOTAL_SPOTS - occupied
+    return total - occupied

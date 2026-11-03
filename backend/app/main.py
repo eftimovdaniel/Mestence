@@ -4,12 +4,20 @@ from fastapi.responses import JSONResponse
 from app.data import PARKING
 from app.models import Parking, NearbyParking
 from app.utils import distance_m
-from app.occupancy import update_free_spots
+from app.occupancy import update_free_spots, watch_images
+import asyncio
+from contextlib import asynccontextmanager
 
 class UTF8JSONResponse(JSONResponse):
     media_type = "application/json; charset=utf-8"
 
-app = FastAPI(title="Mestence API", default_response_class=UTF8JSONResponse)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(watch_images())
+    yield
+    task.cancel()
+
+app = FastAPI(title="Mestence API", default_response_class=UTF8JSONResponse, lifespan = lifespan)
 
 app.add_middleware(
     CORSMiddleware,

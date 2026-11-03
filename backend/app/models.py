@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel
 
 class Parking(BaseModel):
@@ -8,7 +9,9 @@ class Parking(BaseModel):
     total_spots: int
     free_spots: int | None = None
     image: str | None = None
-    
-class NearbyParking (BaseModel):
+    checked_at: datetime | None = None
+    source: str | None = None
+
+class NearbyParking(BaseModel):
     parking: Parking
     distance_m: int

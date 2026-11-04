@@ -4,9 +4,11 @@ import cv2
 from ultralytics import YOLO
 
 try:
-    from spot import free_spots, TOTAL_SPOTS
+    from spot import free_spots
+    from stalls import find_empty_stalls
 except ImportError:
-    from detector.spot import free_spots, TOTAL_SPOTS
+    from detector.spot import free_spots
+    from detector.stalls import find_empty_stalls
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL = YOLO(str(ROOT / "yolo11n-obb.pt"))
@@ -24,7 +26,7 @@ def lot_pixels(width, height):
 def same_car(a, b):
     return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 <= SAME_CAR_PX ** 2
 
-def detect_vehicles(image_path: str) -> int:
+def detect_vehicles(image_path: str):
     image = cv2.imread(image_path)
     if image is None:
         raise SystemExit(f"Ne moze da se procita slikata: {image_path}")
@@ -35,33 +37,47 @@ def detect_vehicles(image_path: str) -> int:
     result = results[0]
     found = []
     if result.obb is not None:
-        for box in result.obb:
+        xywhr = result.obb.xywhr.cpu().numpy()
+        for index, box in enumerate(result.obb):
             points = box.xyxyxyxy[0].cpu().numpy()
             center = (float(points[:, 0].mean()), float(points[:, 1].mean()))
-            found.append((float(box.conf[0]), center, points))
+            found.append((float(box.conf[0]), center, points, xywhr[index]))
     found.sort(key=lambda item: item[0], reverse=True)
     kept = []
     for item in found:
         if any(same_car(item[1], other[1]) for other in kept):
             continue
         kept.append(item)
-    for conf, center, points in kept:
+
+    cars = []
+    for conf, center, points, whr in kept:
+        cx, cy, bw, bh, ang = [float(value) for value in whr]
+        cars.append((cx, cy, ang, max(bw, bh), min(bw, bh)))
         points = points.copy()
         points[:, 0] += x1
         points[:, 1] += y1
-        points = points.astype(int)
-        cv2.polylines(image, [points], isClosed=True, color=(0, 255, 0), thickness=2)
-    free = free_spots(len(kept))
+        cv2.polylines(image, [points.astype(int)], isClosed=True, color=(0, 255, 0), thickness=2)
+
+    empty = find_empty_stalls(crop, cars)
+    for polygon in empty:
+        polygon = polygon.copy()
+        polygon[:, 0] += x1
+        polygon[:, 1] += y1
+        cv2.polylines(image, [polygon], isClosed=True, color=(0, 255, 255), thickness=3)
+
+    occupied = len(kept)
+    total = occupied + len(empty)
+    free = free_spots(occupied, total)
     cv2.rectangle(image, (x1, y1), (x2, y2), (0, 0, 255), 4)
-    cv2.putText(image, f"Vo parcelata: {len(kept)}", (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)
+    cv2.putText(image, f"Vo parcelata: {occupied}", (40, 120), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)
     cv2.putText(image, f"Slobodni: {free}", (40, 200), cv2.FONT_HERSHEY_SIMPLEX, 2.4, (0, 0, 255), 5)
     OUTPUT_DIR.mkdir(exist_ok=True)
     out_path = OUTPUT_DIR / f"detected_{Path(image_path).name}"
     cv2.imwrite(str(out_path), image)
-    print(f"Vozila vo parcelata: {len(kept)}")
-    print(f"Slobodni mesta: {free} od {TOTAL_SPOTS}")
+    print(f"Vozila vo parcelata: {occupied}")
+    print(f"Slobodni mesta: {free} od {total}")
     print(f"Zacuvano vo: {out_path}")
-    return len(kept)
+    return occupied, total
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

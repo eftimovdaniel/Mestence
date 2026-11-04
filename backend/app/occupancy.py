@@ -14,8 +14,9 @@ def update_free_spots(parking: Parking) -> bool:
     from detector.detect import detect_vehicles
     from detector.spot import free_spots
     with LOCK:
-        occupied = detect_vehicles(str(ROOT / parking.image))
-        parking.free_spots = free_spots(occupied, parking.total_spots)
+        occupied, total = detect_vehicles(str(ROOT / parking.image))
+        parking.total_spots = total
+        parking.free_spots = free_spots(occupied, total)
         parking.checked_at = datetime.now(timezone.utc)
         parking.source = "image"
     return True

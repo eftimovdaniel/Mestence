@@ -24,6 +24,10 @@ def update_free_spots(parking: Parking) -> bool:
 async def watch_images(interval_s: int = 30):
     while True:
         for parking in PARKING:
-            if parking.image:
+            if not parking.image:
+                continue
+            try:
                 await asyncio.to_thread(update_free_spots, parking)
+            except Exception as error:
+                print(f"Proverkata na {parking.name} ne uspea: {error}")
         await asyncio.sleep(interval_s)
